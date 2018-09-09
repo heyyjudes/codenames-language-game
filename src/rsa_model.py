@@ -20,8 +20,6 @@ sns.set_style(rc={'axes.axisbelow': False, 'legend.frameon': False})
 warnings.filterwarnings('error')
 random.seed(42)
 
-NUM_ADJ = 3
-NUM_NPAIRS = 3
 PLOT_HISTOGRAMS = False
 PLOT_PROB = True
 SAVE_SIMULATIONS = True
@@ -48,7 +46,7 @@ def extract_scenario_table(adj_scen, scen, adj_feat, object_agg_func):
 
     for i in range(len(adj_scen)):
         adj = adj_list_init[i]
-        for j in range(NUM_NPAIRS):
+        for j in range(len(noun_pairs)):
             (ind_0, ind_1) = noun_pairs[j]
             raw[i,j] = object_agg_func([adj_feat[adj][ind_0], adj_feat[adj][ind_1]])
     return raw, noun_pairs.index((n_0, n_1))
@@ -159,10 +157,10 @@ def listener_sub(a_i, rsa_matrices, mturk_scen_listener, word_list, adj_scen, sa
 
     wd_lit = wasserstein(mturk_scen_listener[a_i], rsa_matrices['ll'][a_i])
     wd_prag = wasserstein(mturk_scen_listener[a_i], rsa_matrices['pl'][a_i])
-    wd_uniform = wasserstein(mturk_scen_listener[a_i], np.ones(NUM_NPAIRS) / NUM_NPAIRS)
+    wd_uniform = wasserstein(mturk_scen_listener[a_i], np.ones(len(mturk_scen_listener[a_i])) / len(mturk_scen_listener[a_i]))
     kl_lit = jsd(mturk_scen_listener[a_i], rsa_matrices['ll'][a_i])
     kl_prag = jsd(mturk_scen_listener[a_i], rsa_matrices['pl'][a_i])
-    kl_uniform = jsd(mturk_scen_listener[a_i], np.ones(NUM_NPAIRS) / NUM_NPAIRS)
+    kl_uniform = jsd(mturk_scen_listener[a_i], np.ones(len(mturk_scen_listener[a_i])) / len(mturk_scen_listener[a_i]))
 
     if verbose:
         print(adj_scen[a_i] + '\n')
@@ -184,7 +182,7 @@ def listener_sub(a_i, rsa_matrices, mturk_scen_listener, word_list, adj_scen, sa
         plot_bargraph(hist, label_cat, 'listener', str(scen_num) + '_' + adj_scen[a_i] + '_all_' + '_'.join(adj_scen))
 
     if verbose:
-        for i in range(NUM_NPAIRS):
+        for i in range(len(mturk_scen_listener[a_i])):
             pair1, pair2 = samples[i]
             print(word_list[pair1] + '_' + word_list[pair2])
             print(round(rsa_matrices['ll'][a_i, i], 3))
@@ -227,7 +225,7 @@ def comparison_rsa_listener(rsa_matrices, scen, adj_scen, mturk_scen_listener, w
             literal_dict[adj_scen[a_i]] = {}
             prag_dict[adj_scen[a_i]] = {}
             if SAVE_SIMULATIONS:
-                for w_i in range(NUM_NPAIRS):
+                for w_i in range(len(samples)):
                     mturk_dict[adj_scen[a_i]][str(samples[w_i])] = sub[8][w_i]
                     literal_dict[adj_scen[a_i]][str(samples[w_i])] = sub[9][w_i]
                     prag_dict[adj_scen[a_i]][str(samples[w_i])] = sub[10][w_i]
@@ -287,17 +285,17 @@ def comparison_rsa_speaker(rsa_matrices, scen, adj_scen, mturk_scen_speaker, wor
 
     wd_lit = wasserstein(mturk_scen_speaker, hist['literal'])
     wd_prag = wasserstein(mturk_scen_speaker, hist['pragmatic'])
-    wd_uniform = wasserstein(mturk_scen_speaker, np.ones(NUM_ADJ) / NUM_ADJ)
+    wd_uniform = wasserstein(mturk_scen_speaker, np.ones(len(mturk_scen_speaker)) / len(mturk_scen_speaker))
     kl_lit = jsd(mturk_scen_speaker, hist['literal'])
     kl_prag = jsd(mturk_scen_speaker, hist['pragmatic'])
-    kl_uniform = jsd(mturk_scen_speaker, np.ones(NUM_ADJ) / NUM_ADJ)
+    kl_uniform = jsd(mturk_scen_speaker, np.ones(len(mturk_scen_speaker)) / len(mturk_scen_speaker))
 
 
     if PLOT_HISTOGRAMS:
         plot_bargraph(hist, adj_scen, 'speaker', str(scen_num) + '_ingroup_' + ingroup_str + '_outgroup_' + outgroup_str)
 
 
-    for i in range(NUM_ADJ):
+    for i in range(len(mturk_scen_speaker)):
         if verbose:
             print(adj_scen[i])
             print(round(rsa_matrices['ls'][i, samp_ind_ingroup], 3))
@@ -1705,4 +1703,4 @@ def main(run_rsa=False, run_corr=False, gen_stats=False, experiment_num=3):
 
 
 if __name__ == '__main__':
-    main(run_corr=True, experiment_num=4)
+    main(run_corr=True, experiment_num=1)
