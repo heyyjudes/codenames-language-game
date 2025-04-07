@@ -6,13 +6,13 @@ import seaborn as sns
 import pandas as pd
 import json
 import random
-import data_utils
+import data_utils as data_utils
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from collections import OrderedDict
 import warnings
 from distance_utils import wasserstein, jsd, topk_dist, topk_avg_acc, topk_acc, entropy
-import experiment_utils
+import experiment_utils as experiment_utils
 import scipy.stats
 import visualization_utils as viz_utils
 
@@ -76,8 +76,7 @@ def rsa_listener(raw, alpha):
     literal_listener = raw / raw.sum(axis=1, keepdims=True)
 
     # take agent's rationality into account and normalize
-    with np.warnings.catch_warnings():
-        np.warnings.filterwarnings('ignore', r'divide by zero encountered in log')
+    with np.errstate(divide='ignore'):
         speaker_utility = np.log(literal_listener)
     literal_speaker = np.exp(alpha * speaker_utility)
     literal_speaker /= literal_speaker.sum(axis=0, keepdims=True)
@@ -98,8 +97,7 @@ def rsa_speaker(raw, alpha):
     literal_speaker = raw / raw.sum(axis=0, keepdims=True)
 
     # take agent's rationality into account and normalize
-    with np.warnings.catch_warnings():
-        np.warnings.filterwarnings('ignore', r'divide by zero encountered in log')
+    with np.errstate(divide='ignore'):
         listener_utility = np.log(literal_speaker)
     literal_listener = np.exp(alpha * listener_utility)
     try:
@@ -861,6 +859,7 @@ def run_rsa_analysis(model_feature_list, model_feature_names, csv_keys, word_lis
         code_scenarios_listener, adj_scenarios_listener, mturk_listener_scenarios = listener_data
         code_scenarios_speaker, adj_scenarios_speaker, mturk_speaker_scenarios = speaker_data
     elif ex == 2:
+        print("RUNNNING RSA EX 2")
         listener_data, speaker_data = load_semantic_scen_ex2(counts=False)
         code_scenarios_listener, adj_scenarios_listener, mturk_listener_scenarios, _ = listener_data
         code_scenarios_speaker, adj_scenarios_speaker, mturk_speaker_scenarios, _ = speaker_data
@@ -1093,11 +1092,11 @@ def run_model_probability(model_list, kl=False, rank_corr=False, likelihood=Fals
     '''
     if ex == 1:
         listener_data, speaker_data = load_full_set_scen()
-        code_scenarios_listener, adj_scenarios_listener, mturk_listener_scenarios = listener_data
+        code_scenarios_listener, adj_scenarios_listener, mturk_listener_scenarios, _ = listener_data
         code_scenarios_speaker, adj_scenarios_speaker, mturk_speaker_scenarios = speaker_data
     elif ex == 2:
         listener_data, speaker_data = load_semantic_scen_ex2(counts=False)
-        code_scenarios_listener, adj_scenarios_listener, mturk_listener_scenarios, _ = listener_data
+        code_scenarios_listener, adj_scenarios_listener, mturk_listener_scenarios, _, _ = listener_data
         code_scenarios_speaker, adj_scenarios_speaker, mturk_speaker_scenarios, _ = speaker_data
     else:
         listener_data, speaker_data = load_semantic_scen(counts=False)
@@ -1465,7 +1464,7 @@ def load_semantic_scen(counts=False, filter=True):
     code_scenarios_speaker, adj_scenarios_speaker = merge_scenarios('../output/gibbs_semantic_geo3_speaker100000_used')
 
     if filter:
-        mturk_listener_scenarios, listener_qual_ratings = data_utils.merge_listener_with_ratings(code_scenarios_listener, (
+        mturk_listener_scenarios, listener_qual_ratings, listener_scenario_dict = data_utils.merge_listener_with_ratings(code_scenarios_listener, (
             '../data/listener_semantic3.csv', 9), ('../data/listener_semantic_filter3.csv', 8), word_list,
             '../../graphics_gen/semantic_listener3.npy', num_perm=3, counts=counts, match_arr_file='../../graphics_gen/listener_semantic_match.npy')
 
@@ -1499,7 +1498,7 @@ def load_semantic_scen(counts=False, filter=True):
         code_scenarios_speaker, adj_scenarios_speaker = merge_scenarios(
             '../output/gibbs_semantic_geo3_speaker100000_conf')
 
-    return (code_scenarios_listener, adj_scenarios_listener, mturk_listener_scenarios, listener_qual_ratings), \
+    return (code_scenarios_listener, adj_scenarios_listener, mturk_listener_scenarios, listener_scenario_dict, listener_qual_ratings), \
            (code_scenarios_speaker, adj_scenarios_speaker, mturk_speaker_scenarios, speaker_qual_ratings)
 
 
@@ -1527,10 +1526,14 @@ def load_semantic_scen_ex2(counts=False):
     code_scenarios_speaker = [[ingroup, outgroup] for ingroup, outgroup, adjs in scenarios]
     adj_scenarios_speaker = [adjs for ingroup, outgroup, adjs in scenarios]
 
-    mturk_listener_scenarios, listener_qual_ratings = data_utils.merge_listener_with_ratings(
+    mturk_listener_scenarios, listener_qual_ratings, listener_scenario_dict = data_utils.merge_listener_with_ratings(
         code_scenarios_listener,
-            ('../data/listener_filter_clean.csv', 15), ('../data/listener_semantic.csv', 8),  word_list,
-        '../../graphics_gen/high_conf_listener.npy', counts=counts, scen_len=len(code_scenarios_listener))
+        ('../data/listener_filter_clean.csv', 15), 
+        ('../data/listener_semantic.csv', 8),  
+        word_list,
+        '../../graphics_gen/high_conf_listener.npy', 
+        counts=counts, 
+        scen_len=len(code_scenarios_listener))
 
     with open('../output/gibbs_uniform_listener100000_conf.pickle', 'rb') as f:
         scenarios = pickle.load(f)
@@ -1540,8 +1543,11 @@ def load_semantic_scen_ex2(counts=False):
     adj_scenarios_listener = [adjs for ingroup, outgroup, adjs in scenarios]
 
     mturk_speaker_scenarios, speaker_qual_ratings = data_utils.merge_speaker_with_ratings(adj_scenarios_speaker,
-        ('../data/speaker_filter_clean.csv', 6), ('../data/speaker_semantic.csv', 13), '../../graphics_gen/high_conf_speaker.npy',
-                                                                                    scen_len=len(scenarios), counts=counts)
+        ('../data/speaker_filter_clean.csv', 6), 
+        ('../data/speaker_semantic.csv', 13), 
+        '../../graphics_gen/high_conf_speaker.npy',
+        scen_len=len(scenarios), counts=counts)
+    
     with open('../output/../output/gibbs_uniform_speaker100000_conf.pickle', 'rb') as f:
         scenarios = pickle.load(f)
     scenarios = scenarios['scenarios']
@@ -1549,8 +1555,13 @@ def load_semantic_scen_ex2(counts=False):
     code_scenarios_speaker = [[ingroup, outgroup] for ingroup, outgroup, adjs in scenarios]
     adj_scenarios_speaker = [adjs for ingroup, outgroup, adjs in scenarios]
 
-    return (code_scenarios_listener, adj_scenarios_listener, mturk_listener_scenarios, listener_qual_ratings), \
+    return (code_scenarios_listener, adj_scenarios_listener, mturk_listener_scenarios, listener_scenario_dict, listener_qual_ratings), \
            (code_scenarios_speaker, adj_scenarios_speaker, mturk_speaker_scenarios, speaker_qual_ratings)
+
+def merge_two_dicts(x, y):
+    z = x.copy()   # start with keys and values of x
+    z.update(y)    # modifies z with keys and values of y
+    return z
 
 def load_full_set_scen(single_adj=True):
     '''
@@ -1604,17 +1615,19 @@ def load_full_set_scen(single_adj=True):
         speaker_file = ['../data/speaker_bigram.csv', '../data/speaker_glove.csv']
         listener_file = ['../data/listener_bigram.csv', '../data/listener_glove.csv']
 
-    listener_mturk_scenarios_bigram = data_utils.parse_listener(scenarios[:40], [listener_file[0]], scenario_adjs,
-                                                                word_list, single_adj=False)
-    listener_mturk_scenarios_glove = data_utils.parse_listener(scenarios[40:], [listener_file[1]], scenario_adjs,
-                                                               word_list, single_adj=False)
+    listener_mturk_scenarios_bigram, scenario_dict_bigram = data_utils.parse_listener(scenarios[:40], [listener_file[0]], scenario_adjs,
+                                                                word_list, single_adj=False, with_pair_labels=True)
+    listener_mturk_scenarios_glove, scenario_dict_glove = data_utils.parse_listener(scenarios[40:], [listener_file[1]], scenario_adjs,
+                                                               word_list, single_adj=False, with_pair_labels=True)
     listener_mturk_scenarios = np.concatenate((listener_mturk_scenarios_bigram, listener_mturk_scenarios_glove), axis=0)
+    scenario_dict = merge_two_dicts(scenario_dict_bigram, scenario_dict_glove)
+
     speaker_mturk_scenarios, _ = data_utils.parse_speaker(speaker_file)
 
     if single_adj:
         listener_mturk_scenarios = listener_mturk_scenarios[:, 0:1, :]
         listener_mturk_scenarios = [scen / (scen.sum(axis=1).reshape(-1, 1)) for scen in listener_mturk_scenarios]
-        return (scenarios, scenario_adjs, listener_mturk_scenarios),\
+        return (scenarios, scenario_adjs, listener_mturk_scenarios, scenario_dict),\
                (scenarios, scenario_adjs, speaker_mturk_scenarios)
     else:
         listener_mturk_scenarios = [scen / (scen.sum(axis=1).reshape(-1, 1)) for scen in listener_mturk_scenarios]
@@ -1630,7 +1643,7 @@ def load_full_set_scen(single_adj=True):
                 adj_scenario_listener.append(new_adj_scen)
         new_mturk_listener = np.asarray(new_mturk_listener)
         new_mturk_listener = new_mturk_listener.reshape(len(listener_mturk_scenarios)*8, 1, -1)
-        return (code_scenario_listener, adj_scenario_listener, new_mturk_listener), \
+        return (code_scenario_listener, adj_scenario_listener, new_mturk_listener, scenario_dict), \
                (scenarios, scenario_adjs, speaker_mturk_scenarios)
 
 
@@ -1673,6 +1686,11 @@ def main(run_rsa=False, run_corr=False, gen_stats=False, experiment_num=3):
     if run_rsa:
         if experiment_num == 4:
             run_rsa_analysis_pragmatic([bigram_feats], ['bigram'], csv_keys, word_list)
+        elif experiment_num == 2:
+            model_comp_list = [bigram_feats, conceptnet_feats, w2v_feats, lda_feats]
+            model_comp_list_str = ['bigram_ls', 'conceptnet_ls', 'word2vec_ls', 'lda_ls']
+            run_rsa_analysis(model_comp_list, model_comp_list_str, csv_keys, word_list, ex=experiment_num)
+            run_model_probability(model_comp_list, rank_corr=True, ex=experiment_num)
         else:
             model_comp_list = [bigram_feats, conceptnet_feats, w2v_feats]
             model_comp_list_str = ['bigram_ls', 'conceptnet_ls', 'word2vec_ls']
@@ -1682,6 +1700,9 @@ def main(run_rsa=False, run_corr=False, gen_stats=False, experiment_num=3):
         if experiment_num == 4:
             model_comp_list = [(bigram_feats, 'ls'), (bigram_feats, 'ps')]
             run_model_probability_prag(model_comp_list, rank_corr=True)
+        elif experiment_num == 2:
+            model_comp_list = [(bigram_feats, 'ls'), (conceptnet_feats, 'ls'), (w2v_feats, 'ls'), (lda_feats, 'ls')]
+            run_model_probability(model_comp_list, rank_corr=True, ex=experiment_num)
         else:
             model_comp_list = [(bigram_feats, 'ls'), (conceptnet_feats, 'ls'), (w2v_feats, 'ls')]
             run_model_probability(model_comp_list, rank_corr=True, ex=experiment_num)
@@ -1703,4 +1724,4 @@ def main(run_rsa=False, run_corr=False, gen_stats=False, experiment_num=3):
 
 
 if __name__ == '__main__':
-    main(run_corr=True, experiment_num=1)
+    main(run_corr=True, experiment_num=2)

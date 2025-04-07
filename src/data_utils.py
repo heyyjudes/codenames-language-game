@@ -141,7 +141,9 @@ def merge_listener_with_ratings(code_scenarios, total_listener_file, filtered_li
     # results
     total_listener_file, beg_id, = total_listener_file
     df = pd.read_csv(total_listener_file)
+
     total_scen = len(code_scenarios)
+
     result_beg = beg_id
     result_arr = ['QID' + str(i) for i in range(result_beg, 3 * total_scen + result_beg, 3)]
     result_df = df[result_arr]
@@ -179,34 +181,42 @@ def merge_listener_with_ratings(code_scenarios, total_listener_file, filtered_li
     qual_merged_df = pd.concat([qual_df, filtered_qual_df], axis=0)
     average_qual = list(qual_merged_df.mean())
     mturk_scen = []
+    scenario_dict = []
     adj_counts_arr = []
     for i, id_str in enumerate(filtered_result_df.keys()):
+        
         in_group, out_group = filtered_code_scenarios[i]
         s_list = in_group + out_group
-
         # generate all possible combinations of codewords
         samples = list(itertools.combinations(s_list, 2))
         agg_counts = merged_df[id_str].value_counts()
+        #print(id_str, agg_counts)
         npair_counts = []
+        npair_labels = []
         for ind_0, ind_1 in samples:
             loc_str_1 = codes_list[min(ind_0, ind_1)] + ',' + codes_list[max(ind_0, ind_1)]
             loc_str_2 = codes_list[max(ind_0, ind_1)] + ',' + codes_list[min(ind_0, ind_1)]
             if loc_str_1 in agg_counts.index:
                 npair_counts.append(agg_counts.loc[loc_str_1])
+                npair_labels.append(loc_str_1)
             elif loc_str_2 in agg_counts.index:
                 npair_counts.append(agg_counts.loc[loc_str_2])
+                npair_labels.append(loc_str_2)
             else:
                 npair_counts.append(0)
         if not counts:
             normalized_counts = np.asarray(npair_counts) / sum(npair_counts)
             mturk_scen.append(normalized_counts)
+            scenario_map = dict(zip(npair_labels, normalized_counts))
+            
         else:
             mturk_scen.append(npair_counts)
+            scenario_map = dict(zip(npair_labels, npair_counts))
+        
+        #print(scenario_map)
+        scenario_dict.append(scenario_map)
         adj_counts_arr.append(sum(npair_counts))
 
-    print("max:", max(adj_counts_arr))
-    print("min", min(adj_counts_arr))
-    print("mean: ", np.mean(adj_counts_arr))
     mturk_arr = np.asarray(mturk_scen).reshape(total_scen, 1, len(samples))
     filtered_mturk_arr = []
     filtered_average_qual = []
@@ -219,7 +229,7 @@ def merge_listener_with_ratings(code_scenarios, total_listener_file, filtered_li
         mturk_arr = np.asarray(filtered_mturk_arr)
         average_qual = np.asarray(average_qual)
 
-    return mturk_arr, average_qual
+    return mturk_arr, average_qual, scenario_dict
 
 def parse_listener_with_ratings(code_scenarios, inverse_file, codes_list, counts=False):
     '''
@@ -280,20 +290,24 @@ def parse_speaker(speaker_file_arr):
     for speaker_file in speaker_file_arr:
         with open(speaker_file, 'r') as f:
             for line in f:
-                try:
-                    q = int(line[0])
-                    if q == 1:
-                        line_count = 0
-                        scen = []
+                if line.startswith('mTurkCode'):
+                    break 
+                else: 
+                    line = line.rstrip("\n")
                     fields = line.split(',')
-                    scen.append(int(fields[3]))
-                    line_count += int(fields[3])
-                    if q == NUM_ADJ:
-                        answer_counts.append(line_count)
-                        scenarios_mturks.append(np.array(scen, dtype=np.float))
+                    if len(fields) == 4: 
+                        if len(fields[3]) > 0 and fields[0] not in ['#']:
+                            if len(fields[0]) > 0:
+                                q = int(fields[0])
+                                if q == 1:
+                                    line_count = 0
+                                    scen = []
+                                scen.append(int(fields[3]))
+                                line_count += int(fields[3])
+                                if q == NUM_ADJ:
+                                    answer_counts.append(line_count)
+                                    scenarios_mturks.append(np.array(scen, dtype=float))
 
-                except:
-                    pass
         scenarios_mturks = [mscen / mscen.sum(axis=0, keepdims=True) for mscen in scenarios_mturks]
     return scenarios_mturks, answer_counts
 
